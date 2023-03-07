@@ -1,0 +1,43 @@
+name: Packer build
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: packer workflow
+    runs-on: ubuntu-latest
+    environment: database
+    strategy: 
+        matrix:
+            node-version: [18.x]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3.5.0
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Zip folder creation
+        run: |
+          mkdir app_artifact
+          zip -r webapp . -x ".git/" ".github/" "node_modules/*" "package-lock.json"
+          mv webapp.zip app_artifact
+
+      
+      - name: Build Template
+        
+        run: |
+          cd packer
+          packer init ami.pkr.hcl
+          packer validate ami.pkr.hcl
+          packer build \
+          -var-file=variables.pkrvars.hcl  ami.pkr.hcl
+
